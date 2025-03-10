@@ -1,3 +1,4 @@
+from io import BytesIO
 import sys
 import json
 import cv2
@@ -110,14 +111,12 @@ class BarcodeScannerApp(QWidget):
             product = fetch_product(barcode)
             
             if product:
-                product_details = json.dumps(product, indent=4)
+                product_details = json.dumps(product['product'], ensure_ascii=False, indent=4)
                 self.result_area.setText(product_details)
 
-                image_url = product.get("image", [None])
+                image_url = product['product'].get("image")
                 if image_url:
-                    product_details = self.add_image_to_html(product_details, image_url)
-                
-                self.result_area.setHtml(product_details)
+                    self.display_image(image_url)                
             else:
                 self.result_area.setText("Product not found. Please enter details manually.")
                 self.image_label.setHidden(True)
@@ -192,8 +191,14 @@ if __name__ == "__main__":
     window.show()
     sys.exit(app.exec())
 
-def add_image_to_html(self, product_details, image_url):
-    """Formats product details as HTML and embeds the image."""
-    image_html = f'<br><img src="{image_url}" width="200"/>'
-    product_html = f"<pre>{product_details}</pre>" + image_html
-    return product_html
+def display_image(self, url):
+    """Fetch and display product image from URL."""
+    response = requests.get(url)
+    if response.status_code == 200:
+        image_data = BytesIO(response.content)
+        pixmap = QPixmap()
+        pixmap.loadFromData(image_data.read())
+
+        # Set the image to QLabel
+        self.image_label.setPixmap(pixmap.scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio))
+        self.image_label.setHidden(False)
