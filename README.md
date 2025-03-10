@@ -1,5 +1,5 @@
 ```bash
-git clone https://github.com/malle20002/PyQt-Barcode-Scan-App.git
+git clone https://github.com/malle2002/PyQt-Barcode-Scan-App.git
 ```
 
 ```bash
