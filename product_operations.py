@@ -6,16 +6,33 @@ API_URL = "https://api.barcodelookup.com/v3/products"
 
 def fetch_product_from_db(barcode):
     """Fetch product details from Neo4j database and convert it to a dictionary."""
-    query = "MATCH (p:Product {barcode: $barcode}) RETURN p"
+    query = "MATCH (p:Product {barcode: $barcode})-[r]-(related) RETURN p,related"
     
     with get_db_connection() as driver:
         with driver.session() as session:
             result = session.run(query, barcode=barcode)
-            record = result.single()
-            if record:
-                node = record["p"]
-                # Convert Neo4j Node to dictionary
-                return dict(node)  
+            records = result.data()
+            
+            if records:
+                product_dict = {}
+                
+                for record in records:
+                    product_node = record['p']
+                    related_node = record['related']
+                    
+                    if 'p' not in product_dict:
+                        product_dict['product'] = dict(product_node)
+                    
+                    if 'related_nodes' not in product_dict:
+                        product_dict['related_nodes'] = []
+                    product_dict['related_nodes'].append(dict(related_node))
+
+                related_nodes = product_dict.get('related_nodes', [])
+                for node in related_nodes:
+                    if 'image' in node:
+                        product_dict['product']['image'] = node['image']
+                
+                return product_dict
 
     return None
 
@@ -27,6 +44,7 @@ def add_product_to_db(product):
     category = product.get("category", None)
     brand = product.get("brand", None)
     manufacturer = product.get("manufacturer", None)
+    image = product.get("image")
 
     query = """
     MERGE (p:Product {barcode: $barcode})
@@ -35,17 +53,19 @@ def add_product_to_db(product):
     MERGE (b:Brand {name: $brand})
     MERGE (c:Category {name: $category})
     MERGE (m:Manufacturer {name: $manufacturer})
+    MERGE (i:Image {image: $image})
 
     MERGE (p)-[:BELONGS_TO]->(b)
     MERGE (p)-[:CLASSIFIED_AS]->(c)
     MERGE (p)-[:MANUFACTURED_BY]->(m)
+    MERGE (p)-[:POSSESSES]->(i)
     """
 
 
     with get_db_connection() as driver:
         with driver.session() as session:
             session.run(query, barcode=barcode_number, title=title, category=category,
-                brand=brand, manufacturer=manufacturer)
+                brand=brand, manufacturer=manufacturer, image=image)
             print(f"Product {product['barcode_number']} added to Neo4j.")
 
 def fetch_product(barcode):
@@ -70,7 +90,12 @@ def fetch_product(barcode):
 
 def fetch_all_products_from_neo4j():
     """Fetch all products from Neo4j."""
-    query = "match (p:Product)-[:CLASSIFIED_AS]->(c:Category), (p)-[:MANUFACTURED_BY]->(m:Manufacturer),(p)-[:BELONGS_TO]->(b:Brand) return p.title as Title, c.name as Category, m.name as Manufacturer, b.name as Brand;"
+    query = """MATCH
+        (p:Product)-[:CLASSIFIED_AS]->(c:Category),
+        (p)-[:MANUFACTURED_BY]->(m:Manufacturer),
+        (p)-[:BELONGS_TO]->(b:Brand) 
+    OPTIONAL MATCH (p)-[:POSSESSES]->(i:Image)
+    RETURN p.title as Title, c.name as Category, m.name as Manufacturer, b.name as Brand, COALESCE(i.name, '') AS Image"""
 
     with get_db_connection() as driver:
         with driver.session() as session:
