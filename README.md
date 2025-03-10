@@ -28,9 +28,9 @@ source myworld/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
-
+#### ```If needed```
 ```bash
-pip install pandas PyQt6 neo4j
+pip install pandas PyQt6 neo4j opencv-python
 ```
 
 ### Start Neo4j Graph Database
